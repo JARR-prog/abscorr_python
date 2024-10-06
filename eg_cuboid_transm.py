@@ -15,15 +15,14 @@ NIST Center for Neutron Research
 
 import numpy as np
 import abscorr as abcr
-import multiprocessing as multip
-import matplotlib.pyplot as plt
 import time
 
 
 
 def boxsmpltransm(theta,twotheta,**kwargs):
     """
-
+    Example program to calculate the transmission of a cuboid
+    
     Parameters
     ----------
     theta : float
@@ -40,17 +39,19 @@ def boxsmpltransm(theta,twotheta,**kwargs):
 
     s0=[0.0,1.0,0.0]    #   Incident beam
     s=[0.0,1.0,0.0]     #   Scattered beam  
-    mu_ei=2.0           #   Linear absorption factor for the incident beam
-    mu_ef=2.0           #   Linear absorption factor for the scattered beam
-    samplebox=abcr.boxsample(1,1.55,3.1)
+    mu_ei=4.0           #   Linear absorption factor for the incident beam in cm^-1
+    mu_ef=4.0           #   Linear absorption factor for the scattered beam in cm^-1
+    lx=2.0              #   cuboid width lenght and height
+    ly=0.5
+    lz=2.0
+    samplebox=abcr.boxsample(lx,ly,lz)
     ss0=abcr.srotxy(s0,-1*theta)
     ss=abcr.srotxy(abcr.srotxy(s,-1*theta),twotheta)
     transm=abcr.integ(ss0, ss, samplebox,mu_ei,mu_ef)
     if 'file_out' in kwargs:
        file2write=kwargs["file_out"]
-       ff=open(file2write, 'a')
-       np.savetxt(ff,[[theta,twotheta,transm]])
-       ff.close()
+       with open(file2write, 'a') as ff:
+           np.savetxt(ff,[[theta,twotheta,transm]],fmt='%1.3f',delimiter='\t')
        
     if 'return_list' in kwargs:
         return_list=kwargs["return_list"] 
@@ -61,6 +62,8 @@ def boxsmpltransm(theta,twotheta,**kwargs):
 
 def trans_sample_sequential(angles,**kwargs):
     """
+    Calculate the transmssion sequentially giving a list of [theta,twotheta] angles
+    
     Parameters
     ----------
 
@@ -82,12 +85,11 @@ def trans_sample_sequential(angles,**kwargs):
     -------
                 A list with with three columns [theta, twotheta, transmission]
     """ 
-    
+    startime=time.time()
     if type(angles)==str:
         file2read=angles
-        ff=open(file2read, 'r')
-        angles=np.loadtxt(ff)
-        ff.close()
+        with open(file2read, 'r') as ff:
+            angles=np.loadtxt(ff)
         
     if 'file_out' in kwargs:
        file2write=kwargs["file_out"]
@@ -96,49 +98,25 @@ def trans_sample_sequential(angles,**kwargs):
     
     transmi=[boxsmpltransm(angle[0],angle[1],**kwargs) for angle in angles]
         
-    
+    print('done.', time.time()-startime)
     return transmi
     
-    
-
-
-
-      
               
 
-
-              
-# calculate the absorption
-# in a multitasking loop
-def trans_sample_multitasking(angles,**kwargs):
+def trans_test():
+    """
+    Calculate the transmission sequencially and save it in the file test_cuboid.txt'   
+    For multiprocessign open file cuboid_mpt.py
+    """
+    range_theta=[0,10,5]        # Range of theta angles [min, max, steps]
+    range_twotheta=[0,10,5]     # Range of twotheta angles [min, max, steps]
+    angles=abcr.generate_Sample_theta_2theta(range_theta, range_twotheta)
+    file_out='test_cuboid.txt'  # file to save thge results
+    trans_sample_sequential(angles,file_out=file_out)
     
-    startime=time.time()
     
-    if type(angles)==str:
-        file2read=angles
-        ff=open(file2read, 'r')
-        angles=np.loadtxt(ff)
-        ff.close()
-        
-    if 'file_out' in kwargs:
-       file2write=kwargs["file_out"]
-       ff=open(file2write, 'w')
-       ff.close()
-       
-   
-    manager = multip.Manager()
-    return_list = manager.list()
+def plot_transmission():
+    abcr.generate_contour_plot("test_cuboid_mtp2.txt")    
 
-    jobs = []
-
-    for tt in angles:
-        kwargs['return_list']=return_list
-        p = multip.Process(target=boxsmpltransm, args=(tt[0], tt[1]),kwargs=kwargs)
-        jobs.append(p)
-        p.start()
-    for proc in jobs:
-        proc.join()
-    print('done.', time.time()-startime)
-    return(return_list)
-
+    
 
